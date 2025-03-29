@@ -8,26 +8,20 @@ var app = builder.Build();
 
 app.Run(static async (HttpContext context) =>
 {
-    /*foreach (var key in context.Request.Query.Keys)
+    if (context.Request.Path.StartsWithSegments("/"))//default landing page, currently with test data
     {
-        await context.Response.WriteAsync($"{key}: {context.Request.Query[key]}\r\n");
-    }*/
-
-    //HTTP Methods
-    if (context.Request.Method == "GET")//landing page default, currently shows test data to conmfirm server is running
-    {
-        if (context.Request.Path.StartsWithSegments("/"))//default route
+        await context.Response.WriteAsync($"The Method is: {context.Request.Method}\r\n");
+        await context.Response.WriteAsync($"The URL is: {context.Request.Path}\r\n");
+        await context.Response.WriteAsync($"\r\nHeaders: \r\n");
+        foreach (var key in context.Response.Headers.Keys)
         {
-            await context.Response.WriteAsync($"The method is: {context.Request.Method}\r\n");
-            await context.Response.WriteAsync($"The URL is: {context.Request.Path}\r\n");
-
-            await context.Response.WriteAsync($"\r\nHeaders: \r\n");
-            foreach (var key in context.Request.Headers.Keys)
-            {
-                await context.Response.WriteAsync($"{key}: {context.Request.Headers[key]}\r\n");
-            }
+            await context.Response.WriteAsync($"{key}: {context.Request.Headers[key]}\r\n");
         }
-        else if (context.Request.Path.StartsWithSegments("/employees"))//Employees route for CRUD operations
+
+    }//end landing page
+    else if (context.Request.Path.StartsWithSegments("/employees")) {
+        //HTTP Methods
+        if (context.Request.Method == "GET")//landing page default, currently shows test data to conmfirm server is running
         {
             var employees = EmployeesRepository.GetEmployees();//get a list of employees
 
@@ -36,86 +30,161 @@ app.Run(static async (HttpContext context) =>
             {
                 await context.Response.WriteAsync($"{employee.EmployeeFirstName} {employee.EmployeeLastName}: \t\t{employee.EmployeePosition}\r\n");//display each employee's info
             }
-        }//end employees route
-    }//end GET
-    else if (context.Request.Method == "POST")//POST method to add an employee to the list
-    {
-        if (context.Request.Path.StartsWithSegments("/employees"))
-        {
-            /* var employee = new Employee(5, "Ronnie James", "Dio", "Membranophone Experimentalist", 500000);
-             await context.Response.WriteAsync($"Employee, {employee.EmployeeFirstName} {employee.EmployeeLastName}, added to the list");*/
 
-            using var reader = new StreamReader(context.Request.Body);
-            var body = await reader.ReadToEndAsync();
-            var employee = JsonSerializer.Deserialize<Employee>(body);
-
-            if (employee is not null)
+            if (context.Request.Method == "POST")//POST method to add an employee to the list
             {
-                EmployeesRepository.AddEmployee(employee);
-                await context.Response.WriteAsync($"Employee: {employee.EmployeeFirstName} {employee.EmployeeLastName} added. Records updated.");
-            }
-
-            
-        }
-    }//end POST
-    else if (context.Request.Method == "PUT")//PUT method to update an employee in the list
-    {
-        if (context.Request.Path.StartsWithSegments("/employees"))
-        {
-            /* var employee = new Employee(5, "Ronnie James", "Dio", "Membranophone Experimentalist", 500000);
-             await context.Response.WriteAsync($"Employee, {employee.EmployeeFirstName} {employee.EmployeeLastName}, added to the list");*/
-            //get a list of employees
-            using var reader = new StreamReader(context.Request.Body);
-            var body = await reader.ReadToEndAsync();
-            var employee = JsonSerializer.Deserialize<Employee>(body);
-            //Update employee with "PUT" info from request
-            var result = EmployeesRepository.UpdateEmployee(employee);
-            if (result)
-            {
-                await context.Response.WriteAsync("Employee updated successfully");
-            }
-            else
-            {
-                await context.Response.WriteAsync("No employee found");
-            }
-        }
-    }//end PUT
-    else if (context.Request.Method == "DELETE")//DELETE method to remove an employee from the list
-    {
-        if (context.Request.Path.StartsWithSegments("/employees"))
-        {
-            if (context.Request.Query.ContainsKey("EmployeeId"))
-            {
-                var id = context.Request.Query["EmployeeId"];
-                if (int.TryParse(id, out int employeeId))
+                if (context.Request.Path.StartsWithSegments("/employees"))
                 {
-                    if (context.Request.Headers["Authorization"]=="dredge")//auth check
+                    using var reader = new StreamReader(context.Request.Body);
+                    var body = await reader.ReadToEndAsync();
+                    var employee = JsonSerializer.Deserialize<Employee>(body);
+
+                    if (employee is not null)
                     {
-                        var employee = EmployeesRepository.DeleteEmployee(employeeId);
-                        if (employee)
-                        {
-                            await context.Response.WriteAsync($"Employee deleted. Records updated.");
-                        }
-                        else
-                        {
-                            await context.Response.WriteAsync("Employee not found.  Records unchanged.");
-                        }
-                    }//end auth check
-                    else//if not authorized, tell user
+                        EmployeesRepository.AddEmployee(employee);
+                        await context.Response.WriteAsync($"Employee: {employee.EmployeeFirstName} {employee.EmployeeLastName} added. Records updated.");
+                    }
+
+
+                }
+            }//end POST
+            else if (context.Request.Method == "PUT")//PUT method to update an employee in the list
+            {
+                if (context.Request.Path.StartsWithSegments("/employees"))
+                {
+                    /* var employee = new Employee(5, "Ronnie James", "Dio", "Membranophone Experimentalist", 500000);
+                     await context.Response.WriteAsync($"Employee, {employee.EmployeeFirstName} {employee.EmployeeLastName}, added to the list");*/
+                    //get a list of employees
+                    using var reader = new StreamReader(context.Request.Body);
+                    var body = await reader.ReadToEndAsync();
+                    var employee = JsonSerializer.Deserialize<Employee>(body);
+                    //Update employee with "PUT" info from request
+                    var result = EmployeesRepository.UpdateEmployee(employee);
+                    if (result)
                     {
-                        context.Response.StatusCode = 401;
-                        await context.Response.WriteAsync("User Unauthorized to delete...");
+                        await context.Response.WriteAsync("Employee updated successfully");
+                    }
+                    else
+                    {
+                        await context.Response.WriteAsync("No employee found");
+                    }
+                }
+            }//end PUT
+            else if (context.Request.Method == "DELETE")//DELETE method to remove an employee from the list
+            {
+                if (context.Request.Path.StartsWithSegments("/employees"))
+                {
+                    if (context.Request.Query.ContainsKey("EmployeeId"))
+                    {
+                        var id = context.Request.Query["EmployeeId"];
+                        if (int.TryParse(id, out int employeeId))
+                        {
+                            if (context.Request.Headers["Authorization"] == "dredge")//auth check
+                            {
+                                var employee = EmployeesRepository.DeleteEmployee(employeeId);
+                                if (employee)
+                                {
+                                    await context.Response.WriteAsync($"Employee deleted. Records updated.");
+                                }
+                                else
+                                {
+                                    await context.Response.WriteAsync("Employee not found.  Records unchanged.");
+                                }
+                            }//end auth check
+                            else//if not authorized, tell user
+                            {
+                                context.Response.StatusCode = 401;
+                                await context.Response.WriteAsync("User Unauthorized to delete...");
+                            }
+                        }
+                    }
+                }
+            }//end DELETE
+            else//if any requests are made outside the allowed above
+            {
+                context.Response.StatusCode = 405;
+                await context.Response.WriteAsync("Method not allowed");
+            }//end fallback.
+        }//end GET
+        else if (context.Request.Method == "POST")//POST method to add an employee to the list
+        {
+            if (context.Request.Path.StartsWithSegments("/employees"))
+            {
+                /* var employee = new Employee(5, "Ronnie James", "Dio", "Membranophone Experimentalist", 500000);
+                 await context.Response.WriteAsync($"Employee, {employee.EmployeeFirstName} {employee.EmployeeLastName}, added to the list");*/
+
+                using var reader = new StreamReader(context.Request.Body);
+                var body = await reader.ReadToEndAsync();
+                var employee = JsonSerializer.Deserialize<Employee>(body);
+
+                if (employee is not null)
+                {
+                    EmployeesRepository.AddEmployee(employee);
+                    await context.Response.WriteAsync($"Employee: {employee.EmployeeFirstName} {employee.EmployeeLastName} added. Records updated.");
+                }
+
+
+            }
+        }//end POST
+        else if (context.Request.Method == "PUT")//PUT method to update an employee in the list
+        {
+            if (context.Request.Path.StartsWithSegments("/employees"))
+            {
+                /* var employee = new Employee(5, "Ronnie James", "Dio", "Membranophone Experimentalist", 500000);
+                 await context.Response.WriteAsync($"Employee, {employee.EmployeeFirstName} {employee.EmployeeLastName}, added to the list");*/
+                //get a list of employees
+                using var reader = new StreamReader(context.Request.Body);
+                var body = await reader.ReadToEndAsync();
+                var employee = JsonSerializer.Deserialize<Employee>(body);
+                //Update employee with "PUT" info from request
+                var result = EmployeesRepository.UpdateEmployee(employee);
+                if (result)
+                {
+                    await context.Response.WriteAsync("Employee updated successfully");
+                }
+                else
+                {
+                    await context.Response.WriteAsync("No employee found");
+                }
+            }
+        }//end PUT
+        else if (context.Request.Method == "DELETE")//DELETE method to remove an employee from the list
+        {
+            if (context.Request.Path.StartsWithSegments("/employees"))
+            {
+                if (context.Request.Query.ContainsKey("EmployeeId"))
+                {
+                    var id = context.Request.Query["EmployeeId"];
+                    if (int.TryParse(id, out int employeeId))
+                    {
+                        if (context.Request.Headers["Authorization"] == "dredge")//auth check
+                        {
+                            var employee = EmployeesRepository.DeleteEmployee(employeeId);
+                            if (employee)
+                            {
+                                await context.Response.WriteAsync($"Employee deleted. Records updated.");
+                            }
+                            else
+                            {
+                                await context.Response.WriteAsync("Employee not found.  Records unchanged.");
+                            }
+                        }//end auth check
+                        else//if not authorized, tell user
+                        {
+                            context.Response.StatusCode = 401;
+                            await context.Response.WriteAsync("User Unauthorized to delete...");
+                        }
                     }
                 }
             }
-        }
-    }//end DELETE
-    else//if any requests are made outside the allowed above
-    {
-        context.Response.StatusCode = 405;
-        await context.Response.WriteAsync("Method not allowed");
-    }//end fallback.
-    
+        }//end DELETE
+        else//if any requests are made outside the allowed above
+        {
+            context.Response.StatusCode = 405;
+            await context.Response.WriteAsync("Method not allowed");
+        }//end fallback.
+    }//end employees
+
 });
 app.Run();//runs the application in an infinite loop and starts the Kestrel server to listen for http requests
 
