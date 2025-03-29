@@ -13,16 +13,10 @@ app.Run(static async (HttpContext context) =>
         await context.Response.WriteAsync($"{key}: {context.Request.Query[key]}\r\n");
     }*/
 
-
-
-
-
-
-
     //HTTP Methods
-    if (context.Request.Method == "GET")
+    if (context.Request.Method == "GET")//landing page default, currently shows test data to conmfirm server is running
     {
-        if (context.Request.Path.StartsWithSegments("/"))
+        if (context.Request.Path.StartsWithSegments("/"))//default route
         {
             await context.Response.WriteAsync($"The method is: {context.Request.Method}\r\n");
             await context.Response.WriteAsync($"The URL is: {context.Request.Path}\r\n");
@@ -33,18 +27,18 @@ app.Run(static async (HttpContext context) =>
                 await context.Response.WriteAsync($"{key}: {context.Request.Headers[key]}\r\n");
             }
         }
-        else if (context.Request.Path.StartsWithSegments("/employees"))
+        else if (context.Request.Path.StartsWithSegments("/employees"))//Employees route for CRUD operations
         {
-            var employees = EmployeesRepository.GetEmployees();
+            var employees = EmployeesRepository.GetEmployees();//get a list of employees
 
             await context.Response.WriteAsync($"\r\nEmployee List: \r\n\n");
-            foreach (var employee in employees)
+            foreach (var employee in employees)//display each employee in the list
             {
-                await context.Response.WriteAsync($"{employee.EmployeeFirstName} {employee.EmployeeLastName}: \t\t{employee.EmployeePosition}\r\n");
+                await context.Response.WriteAsync($"{employee.EmployeeFirstName} {employee.EmployeeLastName}: \t\t{employee.EmployeePosition}\r\n");//display each employee's info
             }
-        }
+        }//end employees route
     }//end GET
-    else if (context.Request.Method == "POST")
+    else if (context.Request.Method == "POST")//POST method to add an employee to the list
     {
         if (context.Request.Path.StartsWithSegments("/employees"))
         {
@@ -55,21 +49,25 @@ app.Run(static async (HttpContext context) =>
             var body = await reader.ReadToEndAsync();
             var employee = JsonSerializer.Deserialize<Employee>(body);
 
-            EmployeesRepository.AddEmployee(employee);
+            if (employee is not null)
+            {
+                EmployeesRepository.AddEmployee(employee);
+                await context.Response.WriteAsync($"Employee: {employee.EmployeeFirstName} {employee.EmployeeLastName} added. Records updated.");
+            }
+
+            
         }
     }//end POST
-    else if (context.Request.Method == "PUT")
+    else if (context.Request.Method == "PUT")//PUT method to update an employee in the list
     {
         if (context.Request.Path.StartsWithSegments("/employees"))
         {
             /* var employee = new Employee(5, "Ronnie James", "Dio", "Membranophone Experimentalist", 500000);
              await context.Response.WriteAsync($"Employee, {employee.EmployeeFirstName} {employee.EmployeeLastName}, added to the list");*/
-
             //get a list of employees
             using var reader = new StreamReader(context.Request.Body);
             var body = await reader.ReadToEndAsync();
             var employee = JsonSerializer.Deserialize<Employee>(body);
-
             //Update employee with "PUT" info from request
             var result = EmployeesRepository.UpdateEmployee(employee);
             if (result)
@@ -82,27 +80,32 @@ app.Run(static async (HttpContext context) =>
             }
         }
     }//end PUT
-    else if (context.Request.Method == "DELETE")
+    else if (context.Request.Method == "DELETE")//DELETE method to remove an employee from the list
     {
         if (context.Request.Path.StartsWithSegments("/employees"))
         {
             if (context.Request.Query.ContainsKey("EmployeeId"))
             {
                 var id = context.Request.Query["EmployeeId"];
-
                 if (int.TryParse(id, out int employeeId))
                 {
-                    var result = EmployeesRepository.DeleteEmployee(employeeId);
-                    if (result)
+                    if (context.Request.Headers["Authorization"]=="dredge")//auth check
                     {
-                        await context.Response.WriteAsync("Employee deleted. Records updated.");
-                    }
-                    else
+                        var employee = EmployeesRepository.DeleteEmployee(employeeId);
+                        if (employee)
+                        {
+                            await context.Response.WriteAsync($"Employee deleted. Records updated.");
+                        }
+                        else
+                        {
+                            await context.Response.WriteAsync("Employee not found.  Records unchanged.");
+                        }
+                    }//end auth check
+                    else//if not authorized, tell user
                     {
-                        await context.Response.WriteAsync("Employee not found.  Records unchanged.");
+                        context.Response.StatusCode = 401;
+                        await context.Response.WriteAsync("User Unauthorized to delete...");
                     }
-                    
-                    
                 }
             }
         }
@@ -112,6 +115,7 @@ app.Run(static async (HttpContext context) =>
         context.Response.StatusCode = 405;
         await context.Response.WriteAsync("Method not allowed");
     }//end fallback.
+    
 });
 app.Run();//runs the application in an infinite loop and starts the Kestrel server to listen for http requests
 
@@ -132,7 +136,8 @@ public class Employee
         EmployeePosition = employeePosition;
         EmployeeSalary = employeeSalary;
     }
-}
+}//endf Employee class
+
 // Repository to hold all employees
 static class EmployeesRepository
 {
@@ -190,4 +195,4 @@ static class EmployeesRepository
         }
         return false;//else if not employee found return false to trigger http error 404
     }
-}
+}//end EmployeesRepository class and its CRUD operations
