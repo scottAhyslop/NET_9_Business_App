@@ -27,3 +27,4 @@ F:\NET_9_Sample\NET_9_Business_App\obj\Debug\net9.0\refint\NET_9_Business_App.dl
 F:\NET_9_Sample\NET_9_Business_App\obj\Debug\net9.0\NET_9_Business_App.pdb
 F:\NET_9_Sample\NET_9_Business_App\obj\Debug\net9.0\NET_9_Business_App.genruntimeconfig.cache
 F:\NET_9_Sample\NET_9_Business_App\obj\Debug\net9.0\ref\NET_9_Business_App.dll
+F:\NET_9_Sample\NET_9_Business_App\obj\Debug\net9.0\NET_9_Business_App.sourcelink.json

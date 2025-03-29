@@ -6,9 +6,21 @@ using System.Text.Json;
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 
-app.Run(async (HttpContext context) =>
+app.Run(static async (HttpContext context) =>
 {
-    if (context.Request.Method =="GET")
+    /*foreach (var key in context.Request.Query.Keys)
+    {
+        await context.Response.WriteAsync($"{key}: {context.Request.Query[key]}\r\n");
+    }*/
+
+
+
+
+
+
+
+    //HTTP Methods
+    if (context.Request.Method == "GET")
     {
         if (context.Request.Path.StartsWithSegments("/"))
         {
@@ -28,16 +40,16 @@ app.Run(async (HttpContext context) =>
             await context.Response.WriteAsync($"\r\nEmployee List: \r\n\n");
             foreach (var employee in employees)
             {
-                await context.Response.WriteAsync($"{employee.EmployeeFirstName} {employee.EmployeeLastName}: \t{employee.EmployeePosition}\r\n");
+                await context.Response.WriteAsync($"{employee.EmployeeFirstName} {employee.EmployeeLastName}: \t\t{employee.EmployeePosition}\r\n");
             }
         }
-    }
+    }//end GET
     else if (context.Request.Method == "POST")
     {
         if (context.Request.Path.StartsWithSegments("/employees"))
         {
-           /* var employee = new Employee(5, "Ronnie James", "Dio", "Membranophone Experimentalist", 500000);
-            await context.Response.WriteAsync($"Employee, {employee.EmployeeFirstName} {employee.EmployeeLastName}, added to the list");*/
+            /* var employee = new Employee(5, "Ronnie James", "Dio", "Membranophone Experimentalist", 500000);
+             await context.Response.WriteAsync($"Employee, {employee.EmployeeFirstName} {employee.EmployeeLastName}, added to the list");*/
 
             using var reader = new StreamReader(context.Request.Body);
             var body = await reader.ReadToEndAsync();
@@ -45,7 +57,7 @@ app.Run(async (HttpContext context) =>
 
             EmployeesRepository.AddEmployee(employee);
         }
-    }
+    }//end POST
     else if (context.Request.Method == "PUT")
     {
         if (context.Request.Path.StartsWithSegments("/employees"))
@@ -63,19 +75,43 @@ app.Run(async (HttpContext context) =>
             if (result)
             {
                 await context.Response.WriteAsync("Employee updated successfully");
-                
             }
             else
             {
                 await context.Response.WriteAsync("No employee found");
             }
         }
-    }
-    else
+    }//end PUT
+    else if (context.Request.Method == "DELETE")
+    {
+        if (context.Request.Path.StartsWithSegments("/employees"))
+        {
+            if (context.Request.Query.ContainsKey("EmployeeId"))
+            {
+                var id = context.Request.Query["EmployeeId"];
+
+                if (int.TryParse(id, out int employeeId))
+                {
+                    var result = EmployeesRepository.DeleteEmployee(employeeId);
+                    if (result)
+                    {
+                        await context.Response.WriteAsync("Employee deleted. Records updated.");
+                    }
+                    else
+                    {
+                        await context.Response.WriteAsync("Employee not found.  Records unchanged.");
+                    }
+                    
+                    
+                }
+            }
+        }
+    }//end DELETE
+    else//if any requests are made outside the allowed above
     {
         context.Response.StatusCode = 405;
         await context.Response.WriteAsync("Method not allowed");
-    }
+    }//end fallback.
 });
 app.Run();//runs the application in an infinite loop and starts the Kestrel server to listen for http requests
 
@@ -143,4 +179,15 @@ static class EmployeesRepository
         return false;//returns as false if no employee existed in db
     }//end UpdateEmployee
 
+    //delete an employee
+    public static bool DeleteEmployee(int employeeId)
+    {
+        var employee = employees.FirstOrDefault(emp => emp.EmployeeId == employeeId); //get employee based on param
+        if (employee is not null)//check if employee is valid
+        {
+            employees.Remove(employee);
+            return true;
+        }
+        return false;//else if not employee found return false to trigger http error 404
+    }
 }
