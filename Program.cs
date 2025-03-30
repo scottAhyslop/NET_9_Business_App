@@ -6,14 +6,14 @@ using System.Text.Json;
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 
-app.Run(static async (HttpContext context) =>
+app.Run(handler: static async (HttpContext context) =>
 {
     if (context.Request.Path.StartsWithSegments("/"))//default landing page, currently with test data
     {
         await context.Response.WriteAsync($"The Method is: {context.Request.Method}\r\n");
         await context.Response.WriteAsync($"The URL is: {context.Request.Path}\r\n");
         await context.Response.WriteAsync($"\r\nHeaders: \r\n");
-        foreach (var key in context.Response.Headers.Keys)
+        foreach (var key in context.Request.Headers.Keys)
         {
             await context.Response.WriteAsync($"{key}: {context.Request.Headers[key]}\r\n");
         }
@@ -44,8 +44,6 @@ app.Run(static async (HttpContext context) =>
                         EmployeesRepository.AddEmployee(employee);
                         await context.Response.WriteAsync($"Employee: {employee.EmployeeFirstName} {employee.EmployeeLastName} added. Records updated.");
                     }
-
-
                 }
             }//end POST
             else if (context.Request.Method == "PUT")//PUT method to update an employee in the list
@@ -100,11 +98,7 @@ app.Run(static async (HttpContext context) =>
                     }
                 }
             }//end DELETE
-            else//if any requests are made outside the allowed above
-            {
-                context.Response.StatusCode = 405;
-                await context.Response.WriteAsync("Method not allowed");
-            }//end fallback.
+            
         }//end GET
         else if (context.Request.Method == "POST")//POST method to add an employee to the list
         {
@@ -122,16 +116,12 @@ app.Run(static async (HttpContext context) =>
                     EmployeesRepository.AddEmployee(employee);
                     await context.Response.WriteAsync($"Employee: {employee.EmployeeFirstName} {employee.EmployeeLastName} added. Records updated.");
                 }
-
-
             }
         }//end POST
         else if (context.Request.Method == "PUT")//PUT method to update an employee in the list
         {
             if (context.Request.Path.StartsWithSegments("/employees"))
             {
-                /* var employee = new Employee(5, "Ronnie James", "Dio", "Membranophone Experimentalist", 500000);
-                 await context.Response.WriteAsync($"Employee, {employee.EmployeeFirstName} {employee.EmployeeLastName}, added to the list");*/
                 //get a list of employees
                 using var reader = new StreamReader(context.Request.Body);
                 var body = await reader.ReadToEndAsync();
@@ -177,14 +167,13 @@ app.Run(static async (HttpContext context) =>
                     }
                 }
             }
-        }//end DELETE
-        else//if any requests are made outside the allowed above
-        {
-            context.Response.StatusCode = 405;
-            await context.Response.WriteAsync("Method not allowed");
-        }//end fallback.
+        }//end DELETE       
     }//end employees
-
+    else//if any requests are made outside the allowed above (fallback)
+    {
+        context.Response.StatusCode = 405;
+        await context.Response.WriteAsync("Method not allowed");
+    }//end fallback.
 });
 app.Run();//runs the application in an infinite loop and starts the Kestrel server to listen for http requests
 
