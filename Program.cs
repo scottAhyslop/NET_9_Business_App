@@ -1,6 +1,8 @@
 
 //initializes the web application and creates a web host
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.Http;
+using System.Security.AccessControl;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,29 +12,68 @@ app.Run(handler: static async (HttpContext context) =>
 {
     if (context.Request.Path.StartsWithSegments("/"))//default landing page, currently with test data
     {
-        await context.Response.WriteAsync($"The Method is: {context.Request.Method}\r\n");
-        await context.Response.WriteAsync($"The URL is: {context.Request.Path}\r\n");
-        await context.Response.WriteAsync($"\r\nHeaders: \r\n");
+        context.Response.Headers["Content-Type"] = "text/html";
+        await context.Response.WriteAsync($"The Method is: {context.Request.Method}<br/>");
+        await context.Response.WriteAsync($"The URL is: {context.Request.Path}<br/>");
+        await context.Response.WriteAsync($"<br/><b>Headers</b>: <br/>");
+        await context.Response.WriteAsync($"<ul>");           
         foreach (var key in context.Request.Headers.Keys)
         {
-            await context.Response.WriteAsync($"{key}: {context.Request.Headers[key]}\r\n");
+            await context.Response.WriteAsync($"<li><b>{key}</b>: {context.Request.Headers[key]}</li>");
         }
-
+        await context.Response.WriteAsync($"</ul>");
     }//end landing page
     else if (context.Request.Path.StartsWithSegments("/employees"))
     {
         //HTTP Methods
         if (context.Request.Method == "GET")//landing page default, currently shows test data to conmfirm server is running
         {
-            var employees = EmployeesRepository.GetEmployees();//get a list of employees
+            context.Response.Headers["Content-Type"] = "text/html";//set display text to html
 
-            await context.Response.WriteAsync($"\r\nEmployee List: \r\n\n");
-            foreach (var employee in employees)//display each employee in the list
+            if (context.Request.Query.ContainsKey("EmployeeId"))//if query params contain an Id, search for that employee
             {
-                await context.Response.WriteAsync($"{employee.EmployeeFirstName} {employee.EmployeeLastName}: \t\t{employee.EmployeePosition}\r\n");//display each employee's info
+                var id = context.Request.Query["EmployeeId"];
+                if (int.TryParse(id, out int employeeId))//parse the query param to an int
+                {
+                    //get a specific employee, from passed in Id
+                    if (employeeId != 0)
+                    {
+                        var employee = EmployeesRepository.GetEmployeeById(employeeId);
+                        if (employee is not null)
+                        {
+                            await context.Response.WriteAsync($"<table>");
+                            
+                                await context.Response.WriteAsync($"<tr><header><td><b>Employee Name</b>: </td><td> {employee.EmployeeFirstName} {employee.EmployeeLastName}</td></header></tr>");                            
+                                await context.Response.WriteAsync($"<tr><td><b>Position</b>:</td><td>{employee.EmployeePosition}</td></tr>");
+                                await context.Response.WriteAsync($"<tr><td><b>Salary</b>:</td><td> {employee.EmployeeSalary}</td></tr>");
+                            await context.Response.WriteAsync($"</table>");
+                        }
+                        else if (employee is null)
+                        {
+                            context.Response.StatusCode = 404;
+                            await context.Response.WriteAsync("Employee not found<br/>");
+                            //TODO display message for timed period, log fail, return to search by Id screen
+                            return;
+                        }
+                    }
+                }
             }
-            context.Response.StatusCode = 201;
-        }
+            else
+            {
+                //get all employees
+                var employees = EmployeesRepository.GetEmployees();//get a list of employees
+                await context.Response.WriteAsync($"<table>");
+                await context.Response.WriteAsync($"<tr><header><b>Employee List</b>: </tr></header>");
+                await context.Response.WriteAsync($"<tr><header><td><b>Employee Name</b></td><td><b>Position</b><td><b>Salary</b></td></tr></header>");
+                foreach (var employee in employees)//display each employee in the list
+                {
+                    await context.Response.WriteAsync($"<tr><td>{employee.EmployeeFirstName} {employee.EmployeeLastName}:</td><td>{employee.EmployeePosition}</td><td>${employee.EmployeeSalary}</td></tr>");//display each employee's info
+                }
+                await context.Response.WriteAsync($"</table>");
+                context.Response.StatusCode = 201;
+            }
+            }
+        }//end GET EmployeeById
         else if (context.Request.Method == "POST")//POST method to add an employee to the list
         {
             if (context.Request.Path.StartsWithSegments("/employees"))
@@ -40,15 +81,29 @@ app.Run(handler: static async (HttpContext context) =>
                 using var reader = new StreamReader(context.Request.Body);
                 var body = await reader.ReadToEndAsync();
                 var employee = JsonSerializer.Deserialize<Employee>(body);
-
-                if (employee is not null)
+                                
+                try
                 {
-                    EmployeesRepository.AddEmployee(employee);
-                    context.Response.StatusCode = 201;
-                    await context.Response.WriteAsync($"Employee: {employee.EmployeeFirstName} {employee.EmployeeLastName} added. Records updated.");
-                    
+                    if (employee is not null)
+                    {
+                        EmployeesRepository.AddEmployee(employee);
+                        context.Response.StatusCode = 201;
+                        await context.Response.WriteAsync($"Employee: {employee.EmployeeFirstName} {employee.EmployeeLastName} added. Records updated.");
+
+                    }
+                    else if (employee is null || employee.EmployeeId <= 0)
+                    {
+                        context.Response.StatusCode = 400;
+                        await context.Response.WriteAsync("Bad response to your request");
+                        //TODO redirect home after displaying timed error message and log error deets
+                        return;
+                    }
                 }
-                
+                catch (Exception ex)
+                {
+                    await context.Response.WriteAsync(ex.ToString());
+                    context.Response.StatusCode = 400;
+                }//end try/catch                
             }
         }//end POST
         else if (context.Request.Method == "PUT")//PUT method to update an employee in the list
@@ -91,12 +146,13 @@ app.Run(handler: static async (HttpContext context) =>
                             }
                             else
                             {
+                                context.Response.StatusCode = 404;//not found
                                 await context.Response.WriteAsync("Employee not found.  Records unchanged.");
                             }
                         }//end auth check
                         else//if not authorized, tell user
                         {
-                            context.Response.StatusCode = 401;
+                            context.Response.StatusCode = 401;//not authorized
                             await context.Response.WriteAsync("User Unauthorized to delete...");
                         }
                     }
@@ -105,10 +161,10 @@ app.Run(handler: static async (HttpContext context) =>
         }//end DELETE 
         else//if any requests are made outside the allowed above (fallback)
         {
-            context.Response.StatusCode = 405;
-            await context.Response.WriteAsync("Method not allowed");
-        }//end fallback.
-    }//end employees
+            context.Response.StatusCode = 404;
+            await context.Response.WriteAsync("Can't be found, sorry...");
+            //TODO: should re-direct home after timed display of message 
+        }//end fallback.    
 });
 app.Run();//runs the application in an infinite loop and starts the Kestrel server to listen for http requests
 
@@ -144,6 +200,11 @@ static class EmployeesRepository
 
     //get a list of employees
     public static List<Employee> GetEmployees() => employees;
+
+    public static Employee? GetEmployeeById(int employeeId)
+    {
+        return employees.FirstOrDefault(emp => emp.EmployeeId == employeeId);
+    }
 
     //add an employee
     public static void AddEmployee(Employee? employee)
@@ -187,5 +248,5 @@ static class EmployeesRepository
             return true;
         }
         return false;//else if not employee found return false to trigger http error 404
-    }
+    }    
 }//end EmployeesRepository class and its CRUD operations
